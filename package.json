@@ -1,0 +1,25 @@
+{
+  "name": "rd-weather",
+  "version": "0.1.0",
+  "description": "Weather collection and web interface",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "jasmine"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bytesnz/rdWeather.git"
+  },
+  "author": "Jack Farley <bytesnz>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bytesnz/rdWeather/issues"
+  },
+  "homepage": "https://github.com/bytesnz/rdWeather#readme",
+  "dependencies": {
+    "molten-core": "https://github.com/MoltenDB/molten-core.git",
+    "molten-storage-json-crud": "https://github.com/MoltenDB/molten-storage-json-crud",
+    "node-schedule": "^1.2.4",
+    "units-shake": "0.2.0"
+  }
+}

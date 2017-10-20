@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "outDir": "./",
+    "sourceMap": false,
+    "noImplicitAny": false,
+    "allowJs": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es5",
+    "lib": ["es2015", "dom"]
+  },
+  "exclude": [],
+  "include": [
+    "./src/index.ts",
+    "./src/lib/**/*.ts"
+  ]
+}
