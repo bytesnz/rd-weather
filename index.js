@@ -4,14 +4,17 @@ var childProcess = require('child_process');
 var exec = function (command, options) {
     return new Promise(function (resolve, reject) {
         childProcess.exec(command, options, function (error, stdout, stderr) {
-            if (error) {
-                reject(error);
-                return;
-            }
-            resolve({
+            var output = {
+                code: 0,
                 stdout: stdout,
-                stderr: stderr
-            });
+                stderr: stderr,
+                signal: null
+            };
+            if (error) {
+                output.code = error.code;
+                output.signal = error.signal;
+            }
+            resolve(output);
         });
     });
 };
@@ -25,6 +28,7 @@ var length_1 = require("units-shake/length");
 //const MDBJsonCrud = require('molten-storage-json-crud').default;
 var molten_core_1 = require("molten-core");
 var molten_storage_json_crud_1 = require("molten-storage-json-crud");
+var moment = require("moment");
 var schemas_1 = require("./lib/schemas");
 var mappings_1 = require("./lib/mappings");
 var round = function (value, decimalPlaces) {
@@ -36,7 +40,6 @@ var liveWeatherInterval = 60;
 var cronString = '* * * * *';
 var vproweatherCmd = 'vproweather -d2';
 var serialDevice = '/dev/ttyUSB0';
-console.log(molten_core_1.default);
 molten_core_1.default({
     storage: {
         default: {
@@ -88,7 +91,6 @@ molten_core_1.default({
             var archivePeriod;
             var match = stdout.match(/^archiveTime = (\d+)$/m);
             if (match) {
-                console.log('match');
                 archivePeriod = parseInt(match[1]);
             }
             console.log('archivePeriod is', archivePeriod);
@@ -99,14 +101,20 @@ molten_core_1.default({
             var lastArchiveDate;
             var importArchiveRecords = function (date) {
                 var promise;
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('importing archive records', (date ? "since " + moment(date).format('YYYY-MM-DDTHH:mm') : ''));
+                }
                 if (date) {
-                    promise = exec(process.env.NODE_ENV !== 'production' ? "cat ./testData/archiveRecord.out" : vproweatherCmd + " -a" + date.toISOString() + " " + serialDevice);
+                    promise = exec(process.env.NODE_ENV !== 'production' ? "cat ./testData/archiveRecord.out" : vproweatherCmd + " -a" + moment(date).format('YYYY-MM-DDTHH:mm') + " " + serialDevice);
                 }
                 else {
                     promise = exec(process.env.NODE_ENV !== 'production' ? "cat ./testData/archiveRecord.out" : vproweatherCmd + " -a " + serialDevice);
                 }
                 return promise.then(function (_a) {
-                    var stdout = _a.stdout, stderr = _a.stderr;
+                    var stdout = _a.stdout, stderr = _a.stderr, code = _a.code, signal = _a.signal;
+                    if (code !== 0) {
+                        console.error("Archive command returned " + code, stderr);
+                    }
                     var lines = stdout.split('\n');
                     var records = [];
                     lines.forEach(function (line) {
@@ -191,7 +199,10 @@ molten_core_1.default({
             var importLiveWeather = function (skipImport) {
                 if (skipImport === void 0) { skipImport = false; }
                 return exec(process.env.NODE_ENV !== 'production' ? "cat ./testData/liveRecord.out" : vproweatherCmd + " -x " + serialDevice).then(function (_a) {
-                    var stdout = _a.stdout, stderr = _a.stderr;
+                    var stdout = _a.stdout, stderr = _a.stderr, code = _a.code, signal = _a.signal;
+                    if (code !== 0) {
+                        console.error("Archive command returned " + code, stderr);
+                    }
                     var lines = stdout.split('\n');
                     var record = {
                         _id: new Date(),
@@ -282,7 +293,9 @@ molten_core_1.default({
             };
             // Get latest live weather
             return importLiveWeather(true).then(function (liveWeatherRecord) {
-                console.log('liveRecord', liveWeatherRecord);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('liveRecord', liveWeatherRecord);
+                }
                 nextRecord = liveWeatherRecord.nextArchiveRecord;
                 // Download archive records since last record in the archive
                 return weatherArchive.read(null, {
@@ -292,7 +305,9 @@ molten_core_1.default({
                     limit: 1
                 });
             }).then(function (results) {
-                console.log('got results from archive', results);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('got results from archive', results);
+                }
                 if (results.length) {
                     return importArchiveRecords(results.row(0)._id.valueOf());
                 }
@@ -303,13 +318,16 @@ molten_core_1.default({
                 if (archiveRecord) {
                     lastArchiveDate = archiveRecord._id;
                 }
-                console.log('got archive record', archiveRecord);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('got archive record', archiveRecord);
+                }
                 console.log('Starting update job');
                 // Set up interval to download the live weather
                 var j = schedule.scheduleJob(cronString, function () {
                     console.log('Getting latest live weather');
                     importLiveWeather().then(function (liveWeather) {
                         if (liveWeather.nextArchiveRecord !== nextRecord) {
+                            console.log('Retrieving archive records');
                             return importArchiveRecords(lastArchiveDate)
                                 .then(function (archiveRecord) {
                                 if (archiveRecord) {

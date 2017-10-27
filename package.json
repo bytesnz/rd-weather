@@ -19,6 +19,7 @@
   "dependencies": {
     "molten-core": "https://github.com/MoltenDB/molten-core.git",
     "molten-storage-json-crud": "https://github.com/MoltenDB/molten-storage-json-crud",
+    "moment": "^2.19.1",
     "node-schedule": "^1.2.4",
     "units-shake": "0.2.0"
   }

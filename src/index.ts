@@ -2,15 +2,18 @@ const childProcess = require('child_process');
 const exec = (command: string, options?: any) => {
   return new Promise((resolve, reject) => {
     childProcess.exec(command, options, (error, stdout, stderr) => {
+      let output = {
+        code: 0,
+        stdout,
+        stderr,
+        signal: null
+      };
       if (error) {
-        reject(error);
-        return;
+        output.code = error.code;
+        output.signal = error.signal;
       }
 
-      resolve({
-        stdout,
-        stderr
-      });
+      resolve(output);
     });
   });
 };
@@ -29,6 +32,8 @@ import { lengthintomm } from 'units-shake/length';
 //const MDBJsonCrud = require('molten-storage-json-crud').default;
 import MoltenDB from 'molten-core';
 import MDBJsonCrud from 'molten-storage-json-crud';
+
+import * as moment from 'moment';
 
 import { weatherArchive, liveWeather } from './lib/schemas';
 
@@ -49,7 +54,6 @@ const vproweatherCmd = 'vproweather -d2';
 const serialDevice = '/dev/ttyUSB0';
 
 
-console.log(MoltenDB);
 MoltenDB({
   storage: {
     default: {
@@ -99,7 +103,6 @@ MoltenDB({
       const match = stdout.match(/^archiveTime = (\d+)$/m);
 
       if (match) {
-        console.log('match');
         archivePeriod = parseInt(match[1]);
       }
       console.log('archivePeriod is', archivePeriod);
@@ -113,13 +116,20 @@ MoltenDB({
 
       const importArchiveRecords = (date?: Date): Promise<ArchiveRecord> => {
         let promise;
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('importing archive records', (date ? `since ${moment(date).format('YYYY-MM-DDTHH:mm')}` : ''));
+        }
         if (date) {
-          promise = exec(process.env.NODE_ENV !== 'production' ? `cat ./testData/archiveRecord.out` : `${vproweatherCmd} -a${date.toISOString()} ${serialDevice}`);
+          promise = exec(process.env.NODE_ENV !== 'production' ? `cat ./testData/archiveRecord.out` : `${vproweatherCmd} -a${moment(date).format('YYYY-MM-DDTHH:mm')} ${serialDevice}`);
         } else {
           promise = exec(process.env.NODE_ENV !== 'production' ? `cat ./testData/archiveRecord.out` : `${vproweatherCmd} -a ${serialDevice}`);
         }
 
-        return promise.then(({stdout, stderr}) => {
+        return promise.then(({stdout, stderr, code, signal}) => {
+          if (code !== 0) {
+            console.error(`Archive command returned ${code}`, stderr);
+          }
+
           const lines = stdout.split('\n');
           let records = [];
 
@@ -212,7 +222,11 @@ MoltenDB({
       };
 
       const importLiveWeather = (skipImport: boolean = false): Promise<LiveWeather> => {
-        return exec(process.env.NODE_ENV !== 'production' ? `cat ./testData/liveRecord.out` : `${vproweatherCmd} -x ${serialDevice}`) .then(({stdout, stderr}) => {
+        return exec(process.env.NODE_ENV !== 'production' ? `cat ./testData/liveRecord.out` : `${vproweatherCmd} -x ${serialDevice}`) .then(({stdout, stderr, code, signal}) => {
+          if (code !== 0) {
+            console.error(`Archive command returned ${code}`, stderr);
+          }
+
           const lines = stdout.split('\n');
           let record = {
             _id: new Date(),
@@ -311,7 +325,10 @@ MoltenDB({
       // Get latest live weather
       return importLiveWeather(true).then((liveWeatherRecord) => {
 
-        console.log('liveRecord', liveWeatherRecord);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('liveRecord', liveWeatherRecord);
+        }
+
         nextRecord = liveWeatherRecord.nextArchiveRecord;
 
         // Download archive records since last record in the archive
@@ -322,7 +339,9 @@ MoltenDB({
           limit: 1
         });
       }).then((results) => {
-        console.log('got results from archive', results);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('got results from archive', results);
+        }
 
         if (results.length) {
           return importArchiveRecords(results.row(0)._id.valueOf());
@@ -334,7 +353,9 @@ MoltenDB({
           lastArchiveDate = archiveRecord._id;
         }
 
-        console.log('got archive record', archiveRecord);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('got archive record', archiveRecord);
+        }
 
         console.log('Starting update job');
         // Set up interval to download the live weather
@@ -342,6 +363,7 @@ MoltenDB({
           console.log('Getting latest live weather');
           importLiveWeather().then((liveWeather) => {
             if (liveWeather.nextArchiveRecord !== nextRecord) {
+              console.log('Retrieving archive records');
               return importArchiveRecords(lastArchiveDate)
                   .then((archiveRecord) => {
                 if (archiveRecord) {
