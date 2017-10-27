@@ -205,6 +205,13 @@ molten_core_1.default({
                             }
                         }
                     });
+                    // Parse isRaining
+                    if (record['isRaining'] === 'yes') {
+                        record['isRaining'] = true;
+                    }
+                    else {
+                        record['isRaining'] = false;
+                    }
                     // Parse Ints
                     [
                         'nextArchiveRecord', 'windSpeed', 'humidity', 'solarRadiation',
