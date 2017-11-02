@@ -127,7 +127,7 @@ molten_core_1.default({
                                 }
                             });
                             // Parse values
-                            record._id = new Date(record.date + "T" + record.time);
+                            record._id = moment(record.date + "T" + record.time).toDate();
                             delete record['time'];
                             delete record['date'];
                             // Parse Floats

@@ -145,7 +145,7 @@ MoltenDB({
               });
 
               // Parse values
-              record._id = new Date(`${record.date}T${record.time}`);
+              record._id = moment(`${record.date}T${record.time}`).toDate();
               delete record['time'];
               delete record['date'];
 
