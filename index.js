@@ -38,7 +38,7 @@ var round = function (value, decimalPlaces) {
 //const schemas = require('./lib/schemas');
 var liveWeatherInterval = 60;
 var cronString = '* * * * *';
-var vproweatherCmd = 'vproweather -d2';
+var vproweatherCmd = 'vproweather -d20';
 var serialDevice = '/dev/ttyUSB0';
 molten_core_1.default({
     storage: {
@@ -99,6 +99,12 @@ molten_core_1.default({
             }
             var nextRecord;
             var lastArchiveDate;
+            /**
+             * Request all the archive records since the archive record for the date
+             * given from the weather station
+             *
+             * @param data Date of the archive record to retrieve all records after
+             */
             var importArchiveRecords = function (date) {
                 var promise;
                 if (process.env.NODE_ENV !== 'production') {
@@ -113,7 +119,7 @@ molten_core_1.default({
                 return promise.then(function (_a) {
                     var stdout = _a.stdout, stderr = _a.stderr, code = _a.code, signal = _a.signal;
                     if (code !== 0) {
-                        console.error("Archive command returned " + code, stderr);
+                        console.error("Archive command returned " + code + ":\n", stderr);
                     }
                     var lines = stdout.split('\n');
                     var records = [];
@@ -196,12 +202,18 @@ molten_core_1.default({
                     }
                 });
             };
+            /**
+             * Download the live weather from the weather station and store it in the
+             * database iff the time is in sync with a NTP server
+             *
+             * @param skipImport Skip the import of the weather into the database
+             */
             var importLiveWeather = function (skipImport) {
                 if (skipImport === void 0) { skipImport = false; }
                 return exec(process.env.NODE_ENV !== 'production' ? "cat ./testData/liveRecord.out" : vproweatherCmd + " -x " + serialDevice).then(function (_a) {
                     var stdout = _a.stdout, stderr = _a.stderr, code = _a.code, signal = _a.signal;
                     if (code !== 0) {
-                        console.error("Archive command returned " + code, stderr);
+                        console.error("Live command returned " + code + ":\n", stderr);
                     }
                     var lines = stdout.split('\n');
                     var record = {
@@ -284,9 +296,18 @@ molten_core_1.default({
                         return Promise.resolve(record);
                     }
                     else {
-                        // Save to the database
-                        return liveWeather.update([record]).then(function () {
-                            return record;
+                        // Check the time is in sync with NTP using timedatectl
+                        return exec('timedatectl | grep \'NTP synchronized: yes\'').then(function (output) {
+                            if (!output.code) {
+                                // Save to the database
+                                return liveWeather.update([record]).then(function () {
+                                    return record;
+                                });
+                            }
+                            else {
+                                console.log('Not storing live weather and time not syncronised');
+                                return record;
+                            }
                         });
                     }
                 });
@@ -324,8 +345,11 @@ molten_core_1.default({
                 console.log('Starting update job');
                 // Set up interval to download the live weather
                 var j = schedule.scheduleJob(cronString, function () {
-                    console.log('Getting latest live weather');
                     importLiveWeather().then(function (liveWeather) {
+                        console.log(moment(liveWeather.date).format('HH:mm') + ": Temp: " + liveWeather.temperature + "\u00B0C Wind: " + liveWeather.windSpeed + "kn gusting " + liveWeather.wind10minMaxSpeed + " " + liveWeather.wind10minMaxDirectoion + "\u00B0 Rain " + liveWeather.rainRate + "mm/hr");
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.log('Next archive record', liveWeather.nextArchiveRecord, nextRecord);
+                        }
                         if (liveWeather.nextArchiveRecord !== nextRecord) {
                             console.log('Retrieving archive records');
                             return importArchiveRecords(lastArchiveDate)

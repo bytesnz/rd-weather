@@ -50,7 +50,7 @@ const round = (value: number, decimalPlaces: number): number => {
 const liveWeatherInterval = 60;
 const cronString = '* * * * *';
 
-const vproweatherCmd = 'vproweather -d2';
+const vproweatherCmd = 'vproweather -d20';
 const serialDevice = '/dev/ttyUSB0';
 
 
@@ -114,6 +114,12 @@ MoltenDB({
       let nextRecord;
       let lastArchiveDate;
 
+      /**
+       * Request all the archive records since the archive record for the date
+       * given from the weather station
+       *
+       * @param data Date of the archive record to retrieve all records after
+       */
       const importArchiveRecords = (date?: Date): Promise<ArchiveRecord> => {
         let promise;
         if (process.env.NODE_ENV !== 'production') {
@@ -127,7 +133,7 @@ MoltenDB({
 
         return promise.then(({stdout, stderr, code, signal}) => {
           if (code !== 0) {
-            console.error(`Archive command returned ${code}`, stderr);
+            console.error(`Archive command returned ${code}:\n`, stderr);
           }
 
           const lines = stdout.split('\n');
@@ -221,10 +227,16 @@ MoltenDB({
         });
       };
 
+      /**
+       * Download the live weather from the weather station and store it in the
+       * database iff the time is in sync with a NTP server
+       *
+       * @param skipImport Skip the import of the weather into the database
+       */
       const importLiveWeather = (skipImport: boolean = false): Promise<LiveWeather> => {
         return exec(process.env.NODE_ENV !== 'production' ? `cat ./testData/liveRecord.out` : `${vproweatherCmd} -x ${serialDevice}`) .then(({stdout, stderr, code, signal}) => {
           if (code !== 0) {
-            console.error(`Archive command returned ${code}`, stderr);
+            console.error(`Live command returned ${code}:\n`, stderr);
           }
 
           const lines = stdout.split('\n');
@@ -314,9 +326,17 @@ MoltenDB({
           if (skipImport) {
             return Promise.resolve(record);
           } else {
-            // Save to the database
-            return liveWeather.update([record]).then(() => {
-              return record;
+            // Check the time is in sync with NTP using timedatectl
+            return exec('timedatectl | grep \'NTP synchronized: yes\'').then((output) => {
+              if (!output.code) {
+                // Save to the database
+                return liveWeather.update([record]).then(() => {
+                  return record;
+                });
+              } else {
+                console.log('Not storing live weather and time not syncronised');
+                return record;
+              }
             });
           }
         });
@@ -360,8 +380,11 @@ MoltenDB({
         console.log('Starting update job');
         // Set up interval to download the live weather
         var j = schedule.scheduleJob(cronString, () => {
-          console.log('Getting latest live weather');
           importLiveWeather().then((liveWeather) => {
+            console.log(`${moment(liveWeather.date).format('HH:mm')}: Temp: ${liveWeather.temperature}°C Wind: ${liveWeather.windSpeed}kn gusting ${liveWeather.wind10minMaxSpeed} ${liveWeather.wind10minMaxDirectoion}° Rain ${liveWeather.rainRate}mm/hr`);
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('Next archive record', liveWeather.nextArchiveRecord, nextRecord);
+            }
             if (liveWeather.nextArchiveRecord !== nextRecord) {
               console.log('Retrieving archive records');
               return importArchiveRecords(lastArchiveDate)
