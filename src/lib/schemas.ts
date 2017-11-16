@@ -18,9 +18,9 @@ export const liveWeather = {
     },
     date: {
       type: 'date',
-      format: 'date',
-      label: 'Date',
-      description: 'Date that the data was recorded',
+      format: 'datetime',
+      label: 'Time',
+      description: 'Date and time that the data was recorded',
       required: true
     },
     barometer: {
