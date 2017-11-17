@@ -381,7 +381,7 @@ MoltenDB({
         // Set up interval to download the live weather
         var j = schedule.scheduleJob(cronString, () => {
           importLiveWeather().then((liveWeather) => {
-            console.log(`${moment(liveWeather.date).format('HH:mm')}: Temp: ${liveWeather.temperature}°C Wind: ${liveWeather.windSpeed}kn gusting ${liveWeather.wind10minMaxSpeed} ${liveWeather.wind10minMaxDirectoion}° Rain ${liveWeather.rainRate}mm/hr`);
+            console.log(`${moment(liveWeather.date).format('HH:mm')}:  Temp: ${liveWeather.temperature}°C  Wind: ${liveWeather.wind2minAverage}kn ${liveWeather.windDirection} gusting ${liveWeather.wind10minMaxSpeed}kn ${liveWeather.wind10minMaxDirection}  Rain: ${liveWeather.rainRate}mm/hr`);
             if (process.env.NODE_ENV !== 'production') {
               console.log('Next archive record', liveWeather.nextArchiveRecord, nextRecord);
             }
