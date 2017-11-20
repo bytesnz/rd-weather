@@ -41,33 +41,31 @@ export const liveWeather = {
       type: 'number',
       label: 'Wind Speed',
       description: 'Wind speed at time of recording',
-      suffix: 'knots'
+      suffix: 'kn'
     },
     windDirection: {
-      type: 'number',
+      type: 'string',
       label: 'Wind Direction',
       description: 'Wind direction at time of recording',
-      suffix: '°'
     },
     wind2minAverage: {
       type: 'number',
       label: 'Two-minute Average Wind Speed',
-      suffix: 'knots'
+      suffix: 'kn'
     },
     wind10minAverage: {
       type: 'number',
       label: 'Ten-minute Average Wind Speed',
-      suffix: 'knots'
+      suffix: 'kn'
     },
     wind10minMaxSpeed: {
       type: 'number',
       label: 'Biggest Gust in Last Ten-minutes',
-      suffix: '°'
+      suffix: 'kn'
     },
     wind10minMaxDirection: {
-      type: 'number',
+      type: 'string',
       label: 'Direction of Biggeset Gust in Last Ten-minutes',
-      suffix: '°'
     },
     humidity: {
       type: 'number',
